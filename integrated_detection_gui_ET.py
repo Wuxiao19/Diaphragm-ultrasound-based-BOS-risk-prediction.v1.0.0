@@ -25,8 +25,13 @@ from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 from sklearn.ensemble import ExtraTreesClassifier
 from tqdm import tqdm
-import requests
-from huggingface_hub import hf_hub_download
+from typing import Optional
+
+try:
+    # Optional dependency: used to auto-download checkpoints from Hugging Face
+    from huggingface_hub import snapshot_download
+except Exception:
+    snapshot_download = None
 
 # ===================================================================
 # Constants
@@ -40,6 +45,11 @@ CHECKPOINT_PSO_B = os.path.join(BASE_DIR, "checkpoint", "PSO", "B_model", "selec
 CHECKPOINT_PSO_M = os.path.join(BASE_DIR, "checkpoint", "PSO", "M_model", "selected_features_idx.txt")
 CHECKPOINT_RF_DIR = os.path.join(BASE_DIR, "checkpoint", "ExtraTrees")
 DETECT_OUTPUT_DIR = os.path.join(BASE_DIR, "detect")
+
+# Hugging Face checkpoint repo (folder "checkpoint/" is stored in the repo)
+# You provided: https://huggingface.co/Wuxiao19/Diaphragm-ultrasound-based-BOS-risk-prediction/tree/main/checkpoint
+HF_REPO_ID = "Wuxiao19/Diaphragm-ultrasound-based-BOS-risk-prediction"
+HF_CHECKPOINT_SUBDIR = "checkpoint"
 
 # Model parameters
 BATCH_SIZE = 16
@@ -170,6 +180,9 @@ class DetectionPipeline:
     def load_models(self):
         """Load MIAFEx models and ExtraTrees models"""
         self.log("Loading models...")
+
+        # Ensure checkpoints exist locally (download from Hugging Face if needed)
+        ensure_checkpoints_available(gui_log=self.log)
         
         # Load MIAFEx models
         for model_type in ['B', 'M']:
@@ -218,6 +231,74 @@ class DetectionPipeline:
                 selected_idx = [int(line.strip()) for line in f if line.strip().isdigit()]
             self.selected_features[model_type] = selected_idx
             self.log(f"Loaded {len(selected_idx)} selected features for {model_type} model")
+
+
+def _checkpoint_paths() -> list[str]:
+    """Return a list of checkpoint paths that must exist locally."""
+    paths = [
+        CHECKPOINT_MIAFEX_B,
+        CHECKPOINT_MIAFEX_M,
+        CHECKPOINT_PSO_B,
+        CHECKPOINT_PSO_M,
+        os.path.join(CHECKPOINT_RF_DIR, "et_feature_order.pkl"),
+    ]
+    for fold in range(5):
+        paths.append(os.path.join(CHECKPOINT_RF_DIR, f"et_model_fold_{fold}.pkl"))
+    return paths
+
+
+def ensure_checkpoints_available(
+    hf_repo_id: str = HF_REPO_ID,
+    hf_subdir: str = HF_CHECKPOINT_SUBDIR,
+    local_checkpoint_dir: str = os.path.join(BASE_DIR, "checkpoint"),
+    gui_log: Optional[callable] = None,
+) -> None:
+    """
+    Ensure the local checkpoint directory exists.
+
+    - If required checkpoint files are missing and huggingface_hub is installed,
+      download repo subfolder `checkpoint/` from Hugging Face into local `checkpoint/`.
+    - If still missing after download, raise FileNotFoundError.
+
+    Notes:
+    - For private repos, set environment variable HF_TOKEN before running.
+    """
+    required = _checkpoint_paths()
+    missing_before = [p for p in required if not os.path.exists(p)]
+    if not missing_before:
+        return
+
+    if gui_log:
+        gui_log(
+            "Checkpoint files are missing locally. Attempting to download from Hugging Face..."
+        )
+
+    if snapshot_download is None:
+        raise FileNotFoundError(
+            "Checkpoint files are missing and huggingface_hub is not installed. "
+            "Please install huggingface_hub or place 'checkpoint/' folder in the project root."
+        )
+
+    os.makedirs(local_checkpoint_dir, exist_ok=True)
+
+    # Download only the checkpoint subfolder to local_checkpoint_dir
+    snapshot_download(
+        repo_id=hf_repo_id,
+        allow_patterns=[f"{hf_subdir}/**"],
+        local_dir=BASE_DIR,
+        local_dir_use_symlinks=False,
+        token=os.environ.get("HF_TOKEN"),
+    )
+
+    missing_after = [p for p in required if not os.path.exists(p)]
+    if missing_after:
+        raise FileNotFoundError(
+            "Checkpoint download finished but some required files are still missing, e.g. "
+            f"{missing_after[:3]}"
+        )
+
+    if gui_log:
+        gui_log("Checkpoint download completed.")
     
     def extract_features(self, image_paths, model_type):
         """Extract features from images"""
@@ -584,7 +665,6 @@ class DetectionPipeline:
         if not existing_runs:
             return 1
         return max(existing_runs) + 1
-
 
 
 
