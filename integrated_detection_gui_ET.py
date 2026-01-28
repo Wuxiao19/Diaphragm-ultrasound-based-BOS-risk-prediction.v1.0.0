@@ -581,6 +581,8 @@ def ensure_checkpoints_available(
 
     if gui_log:
         gui_log("Checkpoint download completed.")
+        # Safety: stop here. Any code below this line (if present) must not run.
+        return
         """Extract features from images"""
         self.log(f"Start extracting {model_type}-mode image features...")
         
