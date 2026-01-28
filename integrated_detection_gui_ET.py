@@ -25,6 +25,8 @@ from torch.utils.data import Dataset, DataLoader
 from PIL import Image
 from sklearn.ensemble import ExtraTreesClassifier
 from tqdm import tqdm
+import requests
+from huggingface_hub import hf_hub_download
 
 # ===================================================================
 # Constants
@@ -582,6 +584,7 @@ class DetectionPipeline:
         if not existing_runs:
             return 1
         return max(existing_runs) + 1
+
 
 
 
