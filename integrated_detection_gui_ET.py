@@ -150,7 +150,6 @@ class ImageDataset(Dataset):
             return image, os.path.basename(img_path)
         except Exception as e:
             print(f"Error loading image {img_path}: {e}")
-            # 返回空白图片
             image = Image.new('RGB', (IMAGE_SIZE, IMAGE_SIZE), color='black')
             if self.transform:
                 image = self.transform(image)
@@ -947,6 +946,7 @@ def ensure_checkpoints_available(
         if not existing_runs:
             return 1
         return max(existing_runs) + 1
+
 
 
 
