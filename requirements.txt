@@ -2,6 +2,7 @@ streamlit==1.41.1
 torch==2.9.1
 torchvision==0.24.1
 transformers==4.57.1
+huggingface_hub>=0.20.0
 numpy
 pandas
 scikit-learn
@@ -9,5 +10,6 @@ tqdm
 pillow
 ttkbootstrap
 matplotlib
+
 
 
