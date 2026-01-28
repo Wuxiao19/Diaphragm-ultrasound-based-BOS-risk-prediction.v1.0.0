@@ -47,7 +47,7 @@ CHECKPOINT_RF_DIR = os.path.join(BASE_DIR, "checkpoint", "ExtraTrees")
 DETECT_OUTPUT_DIR = os.path.join(BASE_DIR, "detect")
 
 # Hugging Face checkpoint repo (folder "checkpoint/" is stored in the repo)
-# You provided: https://huggingface.co/Wuxiao19/Diaphragm-ultrasound-based-BOS-risk-prediction/tree/main/checkpoint
+# https://huggingface.co/Wuxiao19/Diaphragm-ultrasound-based-BOS-risk-prediction/tree/main/checkpoint
 HF_REPO_ID = "Wuxiao19/Diaphragm-ultrasound-based-BOS-risk-prediction"
 HF_CHECKPOINT_SUBDIR = "checkpoint"
 
@@ -947,6 +947,7 @@ def ensure_checkpoints_available(
         if not existing_runs:
             return 1
         return max(existing_runs) + 1
+
 
 
 
