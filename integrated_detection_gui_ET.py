@@ -47,7 +47,7 @@ CHECKPOINT_RF_DIR = os.path.join(BASE_DIR, "checkpoint", "ExtraTrees")
 DETECT_OUTPUT_DIR = os.path.join(BASE_DIR, "detect")
 
 # Hugging Face checkpoint repo (folder "checkpoint/" is stored in the repo)
-# https://huggingface.co/Wuxiao19/Diaphragm-ultrasound-based-BOS-risk-prediction/tree/main/checkpoint
+# You provided: https://huggingface.co/Wuxiao19/Diaphragm-ultrasound-based-BOS-risk-prediction/tree/main/checkpoint
 HF_REPO_ID = "Wuxiao19/Diaphragm-ultrasound-based-BOS-risk-prediction"
 HF_CHECKPOINT_SUBDIR = "checkpoint"
 
@@ -150,6 +150,7 @@ class ImageDataset(Dataset):
             return image, os.path.basename(img_path)
         except Exception as e:
             print(f"Error loading image {img_path}: {e}")
+            # 返回空白图片
             image = Image.new('RGB', (IMAGE_SIZE, IMAGE_SIZE), color='black')
             if self.transform:
                 image = self.transform(image)
@@ -232,17 +233,21 @@ class DetectionPipeline:
             self.log(f"Loaded {len(selected_idx)} selected features for {model_type} model")
 
     def extract_features(self, image_paths, model_type):
-        """Extract features from images"""
+        """Extract features from images."""
         self.log(f"Start extracting {model_type}-mode image features...")
 
-        model = self.models[f'miafex_{model_type}']
-        transform = transforms.Compose([
-            transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
-            transforms.ToTensor(),
-        ])
+        model = self.models[f"miafex_{model_type}"]
+        transform = transforms.Compose(
+            [
+                transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+                transforms.ToTensor(),
+            ]
+        )
 
         dataset = ImageDataset(image_paths, transform=transform)
-        dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
+        dataloader = DataLoader(
+            dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=0
+        )
 
         all_features = []
         all_filenames = []
@@ -254,11 +259,7 @@ class DetectionPipeline:
                 all_features.append(refined.cpu().numpy())
                 all_filenames.extend(filenames)
 
-        if all_features:
-            features = np.vstack(all_features)
-        else:
-            features = np.zeros((0, 768), dtype=np.float32)
-
+        features = np.vstack(all_features) if all_features else np.zeros((0, 768), dtype=np.float32)
         self.log(f"Feature extraction done: {len(all_filenames)} images")
         return features, all_filenames
 
@@ -580,8 +581,6 @@ def ensure_checkpoints_available(
 
     if gui_log:
         gui_log("Checkpoint download completed.")
-    
-    def extract_features(self, image_paths, model_type):
         """Extract features from images"""
         self.log(f"Start extracting {model_type}-mode image features...")
         
@@ -797,7 +796,7 @@ def ensure_checkpoints_available(
         # Aggregate multiple rows with the same date + patient_id
         # ==========================================================
 
-        # merged_filename 
+        # merged_filename 本身就是 "date-pid"
         if len(results_df) > 1:
             group_key = 'merged_filename'
 
@@ -946,8 +945,6 @@ def ensure_checkpoints_available(
         if not existing_runs:
             return 1
         return max(existing_runs) + 1
-
-
 
 
 
