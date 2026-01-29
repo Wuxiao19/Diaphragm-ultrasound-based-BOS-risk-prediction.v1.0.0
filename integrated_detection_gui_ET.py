@@ -107,9 +107,10 @@ def load_backbone_and_refinement(model: MIAFEx, ckpt: dict, device):
         raise KeyError("Checkpoint missing model weights.")
 
     if missing:
-        print(f"[extract] Warning: missing keys: {missing}")
+        # 写到 stderr，避免污染 MCP stdio 的 JSON-RPC 通道
+        print(f"[extract] Warning: missing keys: {missing}", file=sys.stderr, flush=True)
     if unexpected:
-        print(f"[extract] Warning: unexpected keys: {unexpected}")
+        print(f"[extract] Warning: unexpected keys: {unexpected}", file=sys.stderr, flush=True)
 
     # 2. Load refinement_weights (same as original logic)
     if 'refinement_weights' in ckpt:
@@ -148,7 +149,8 @@ class ImageDataset(Dataset):
                 image = self.transform(image)
             return image, os.path.basename(img_path)
         except Exception as e:
-            print(f"Error loading image {img_path}: {e}")
+            # 写到 stderr，避免污染 MCP stdio 的 JSON-RPC 通道
+            print(f"Error loading image {img_path}: {e}", file=sys.stderr, flush=True)
             image = Image.new('RGB', (IMAGE_SIZE, IMAGE_SIZE), color='black')
             if self.transform:
                 image = self.transform(image)
@@ -169,8 +171,12 @@ class DetectionPipeline:
         self.selected_features: dict[str, list[int]] = {}
 
     def log(self, message: str) -> None:
-        """Log message to stdout and optional GUI callback."""
-        print(f"[Pipeline] {message}")
+        """Log message to stderr and optional GUI callback.
+
+        注意：在 MCP stdio 模式下，stdout 必须只输出 JSON-RPC，
+        所以所有人类可读日志都写到 stderr。
+        """
+        print(f"[Pipeline] {message}", file=sys.stderr, flush=True)
         if self.gui_callback:
             self.gui_callback(f"[Pipeline] {message}\n")
 
@@ -587,6 +593,16 @@ def ensure_checkpoints_available(
     local_checkpoint_dir: str = os.path.join(BASE_DIR, "checkpoint"),
     gui_log: Optional[callable] = None,
 ) -> None:
+    """
+    Ensure the local checkpoint directory exists.
+
+    - If required checkpoint files are missing and huggingface_hub is installed,
+      download repo subfolder `checkpoint/` from Hugging Face into local `checkpoint/`.
+    - If still missing after download, raise FileNotFoundError.
+
+    Notes:
+    - For private repos, set environment variable HF_TOKEN before running.
+    """
     required = _checkpoint_paths()
     missing_before = [p for p in required if not os.path.exists(p)]
     if not missing_before:
