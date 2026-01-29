@@ -9,6 +9,7 @@ import pandas as pd
 import streamlit as st
 
 from integrated_detection_gui_ET import DetectionPipeline
+from deepseek_ultrasound_agent import deepseek_explain_detection_sync
 
 
 # ============================================================
@@ -355,6 +356,93 @@ if "last_results_df" in st.session_state and "last_output_dir" in st.session_sta
         file_name="detect_result_streamlit.csv",
         mime="text/csv",
     )
+
+    # ============================================================
+    # DeepSeek Agent 解读（可选）
+    # ============================================================
+    st.markdown("---")
+    st.subheader("4. AI 解读（DeepSeek-R1-Distill-Qwen-7B）")
+    st.caption(
+        "说明：AI 解读会把模型预测结果（概率/标签）转成更易读的中文解释与建议。"
+        "该解读不能替代医生最终诊断。"
+    )
+
+    with st.expander("点击展开：配置 DeepSeek（SiliconFlow/OpenAI 兼容接口）", expanded=False):
+        deepseek_api_key = st.text_input(
+            "DeepSeek API Key（建议填到环境变量 DEEPSEEK_API_KEY；这里也可临时输入）",
+            type="password",
+            value=os.getenv("DEEPSEEK_API_KEY", ""),
+        )
+        deepseek_base_url = st.text_input(
+            "Base URL（保持默认即可）",
+            value=os.getenv("DEEPSEEK_BASE_URL", "https://api.siliconflow.cn/v1"),
+        )
+        deepseek_model = st.text_input(
+            "Model（保持默认即可）",
+            value=os.getenv("DEEPSEEK_MODEL", "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"),
+        )
+        deepseek_temperature = st.slider(
+            "temperature（越低越严谨，越高越发散）",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.4,
+            step=0.05,
+        )
+
+    default_intent = (
+        "请根据检测结果，用中文解释患病风险概率和风险级别，并给出 1~3 条临床建议；"
+        "如果是批量结果，请列出高风险患者（例如 risk_probability > 0.7）。"
+        "最后提醒该结果不能替代医生诊断。"
+    )
+    user_intent = st.text_area("你希望 AI 重点回答什么？（可不改）", value=default_intent, height=120)
+
+    if st.button("生成 AI 解读", type="secondary"):
+        if not deepseek_api_key.strip():
+            st.error("请先填写 DeepSeek API Key（或在系统环境变量里设置 DEEPSEEK_API_KEY）。")
+        else:
+            # 把 results_df 转成一个稳定的 JSON 给大模型阅读
+            try:
+                items = []
+                for _, r in results_df.iterrows():
+                    items.append(
+                        {
+                            "merged_key": str(r.get("merged_filename", "")),
+                            "b_image": str(r.get("b_filename", "")),
+                            "m_image": str(r.get("m_filename", "")),
+                            "risk_probability": float(r.get("risk_probability", 0.0)),
+                            "prediction": int(r.get("prediction", 0)),
+                            "prediction_label": str(r.get("prediction_label", "")),
+                        }
+                    )
+
+                detection_json = {
+                    "mode": "single" if len(items) == 1 else "batch",
+                    "total_samples": len(items),
+                    "average_probability": float(np.mean([x["risk_probability"] for x in items]))
+                    if items
+                    else 0.0,
+                    "items": items,
+                    "detect_output_dir": output_dir,
+                }
+
+                with st.spinner("正在调用 DeepSeek 生成中文解读，请稍等..."):
+                    explanation = deepseek_explain_detection_sync(
+                        detection_json=detection_json,
+                        user_intent=user_intent,
+                        api_key=deepseek_api_key.strip(),
+                        base_url=deepseek_base_url.strip(),
+                        model=deepseek_model.strip(),
+                        temperature=float(deepseek_temperature),
+                    )
+
+                st.success("AI 解读生成完成！")
+                st.markdown(explanation)
+
+                with st.expander("查看：AI 解读输入的结构化 JSON（调试用）", expanded=False):
+                    st.json(detection_json)
+
+            except Exception as e:
+                st.error(f"AI 解读生成失败：{e}")
 
     # Missing modality samples
     missing_df = st.session_state.get("last_missing_df")
