@@ -236,7 +236,7 @@ async def run_single_example() -> None:
     # 说明：示例里为了方便，你可以直接在这里临时填 key；
     # 更推荐的做法：用环境变量/`.env`/Streamlit 输入框传入。
     # api_key = os.getenv("QWEN_API_KEY", "").strip()
-    api_key = "sk-jxrjjptjthxipidmqageemugyjpsqvzxdabusdngydpvsxxf"
+    api_key = "sk-vsxxf"
     if not api_key:
         print("❌ 未找到 QWEN_API_KEY（环境变量或 .env），无法调用 Qwen。")
         return
@@ -518,5 +518,6 @@ async def main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
