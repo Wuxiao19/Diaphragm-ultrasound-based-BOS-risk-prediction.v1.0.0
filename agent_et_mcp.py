@@ -112,13 +112,132 @@ async def detect_single_pair_impl(
     b_image_path: str,
     m_image_path: str,
 ) -> SingleDetectionResult:
+    """
+    处理路径转换：如果传入的路径不存在，尝试将其转换为相对于当前工作目录的路径。
+    这样可以处理跨平台（Windows/Linux）的路径问题。
+    """
     b_path = Path(b_image_path)
     m_path = Path(m_image_path)
-
+    
+    # 如果路径不存在，尝试转换为相对路径或基于当前工作目录的路径
     if not b_path.exists():
-        raise FileNotFoundError(f"B 模式图像不存在: {b_path}")
+        current_dir = Path.cwd()
+        filename = b_path.name
+        possible_paths = []
+        
+        # 1. 原始路径（已检查，不存在）
+        possible_paths.append(b_path)
+        
+        # 2. 如果是相对路径，尝试相对于当前工作目录
+        if not b_path.is_absolute():
+            possible_paths.append(current_dir / b_path)
+        
+        # 3. 如果路径包含 "uploaded_inputs"，尝试在当前目录下查找
+        path_str = str(b_path)
+        if "uploaded_inputs" in path_str:
+            # 提取 uploaded_inputs 之后的部分
+            parts = path_str.split("uploaded_inputs")
+            if len(parts) > 1:
+                rel_part = parts[1].lstrip("/\\")
+                possible_paths.append(current_dir / "uploaded_inputs" / rel_part)
+        
+        # 4. 尝试从路径中提取父目录名和文件名
+        if len(b_path.parts) >= 2:
+            parent_dir = b_path.parts[-2]
+            possible_paths.append(current_dir / "uploaded_inputs" / parent_dir / filename)
+        
+        # 5. 尝试直接在当前目录的 uploaded_inputs 下查找（递归搜索）
+        uploaded_dir = current_dir / "uploaded_inputs"
+        if uploaded_dir.exists():
+            for subdir in uploaded_dir.iterdir():
+                if subdir.is_dir():
+                    candidate = subdir / filename
+                    if candidate.exists():
+                        possible_paths.append(candidate)
+        
+        # 去重并检查
+        seen = set()
+        unique_paths = []
+        for p in possible_paths:
+            p_str = str(p)
+            if p_str not in seen:
+                seen.add(p_str)
+                unique_paths.append(p)
+        
+        found = False
+        for p in unique_paths:
+            if p.exists() and p.is_file():
+                b_path = p
+                found = True
+                break
+        
+        if not found:
+            raise FileNotFoundError(
+                f"B 模式图像不存在: {b_image_path}\n"
+                f"已尝试的路径: {[str(p) for p in unique_paths[:5]]}\n"
+                f"当前工作目录: {current_dir}\n"
+                f"请确保文件已上传到 uploaded_inputs 目录"
+            )
+    
     if not m_path.exists():
-        raise FileNotFoundError(f"M 模式图像不存在: {m_path}")
+        # 同样的处理逻辑
+        current_dir = Path.cwd()
+        filename = m_path.name
+        possible_paths = []
+        
+        # 1. 原始路径（已检查，不存在）
+        possible_paths.append(m_path)
+        
+        # 2. 如果是相对路径，尝试相对于当前工作目录
+        if not m_path.is_absolute():
+            possible_paths.append(current_dir / m_path)
+        
+        # 3. 如果路径包含 "uploaded_inputs"，尝试在当前目录下查找
+        path_str = str(m_path)
+        if "uploaded_inputs" in path_str:
+            # 提取 uploaded_inputs 之后的部分
+            parts = path_str.split("uploaded_inputs")
+            if len(parts) > 1:
+                rel_part = parts[1].lstrip("/\\")
+                possible_paths.append(current_dir / "uploaded_inputs" / rel_part)
+        
+        # 4. 尝试从路径中提取父目录名和文件名
+        if len(m_path.parts) >= 2:
+            parent_dir = m_path.parts[-2]
+            possible_paths.append(current_dir / "uploaded_inputs" / parent_dir / filename)
+        
+        # 5. 尝试直接在当前目录的 uploaded_inputs 下查找（递归搜索）
+        uploaded_dir = current_dir / "uploaded_inputs"
+        if uploaded_dir.exists():
+            for subdir in uploaded_dir.iterdir():
+                if subdir.is_dir():
+                    candidate = subdir / filename
+                    if candidate.exists():
+                        possible_paths.append(candidate)
+        
+        # 去重并检查
+        seen = set()
+        unique_paths = []
+        for p in possible_paths:
+            p_str = str(p)
+            if p_str not in seen:
+                seen.add(p_str)
+                unique_paths.append(p)
+        
+        found = False
+        for p in unique_paths:
+            if p.exists() and p.is_file():
+                m_path = p
+                found = True
+                break
+        
+        if not found:
+            raise FileNotFoundError(
+                f"M 模式图像不存在: {m_image_path}\n"
+                f"已尝试的路径: {[str(p) for p in unique_paths[:5]]}\n"
+                f"当前工作目录: {current_dir}\n"
+                f"请确保文件已上传到 uploaded_inputs 目录"
+            )
 
     pipeline = _get_pipeline()
 
@@ -180,13 +299,125 @@ async def detect_batch_folders_impl(
     b_folder_path: str,
     m_folder_path: str,
 ) -> BatchDetectionResult:
+    """
+    处理路径转换：如果传入的路径不存在，尝试将其转换为相对于当前工作目录的路径。
+    这样可以处理跨平台（Windows/Linux）的路径问题。
+    """
     b_dir = Path(b_folder_path)
     m_dir = Path(m_folder_path)
-
+    
+    # 如果路径不存在，尝试转换为相对路径或基于当前工作目录的路径
     if not b_dir.exists() or not b_dir.is_dir():
-        raise FileNotFoundError(f"B 模式图像文件夹不存在或不是文件夹: {b_dir}")
+        current_dir = Path.cwd()
+        possible_paths = []
+        
+        # 1. 原始路径（已检查，不存在）
+        possible_paths.append(b_dir)
+        
+        # 2. 如果是相对路径，尝试相对于当前工作目录
+        if not b_dir.is_absolute():
+            possible_paths.append(current_dir / b_dir)
+        
+        # 3. 如果路径包含 "uploaded_inputs"，尝试在当前目录下查找
+        path_str = str(b_dir)
+        if "uploaded_inputs" in path_str:
+            # 提取 uploaded_inputs 之后的部分
+            parts = path_str.split("uploaded_inputs")
+            if len(parts) > 1:
+                rel_part = parts[1].lstrip("/\\")
+                possible_paths.append(current_dir / "uploaded_inputs" / rel_part)
+        
+        # 4. 尝试从路径中提取目录名
+        if b_dir.name:
+            possible_paths.append(current_dir / "uploaded_inputs" / b_dir.name)
+            possible_paths.append(current_dir / b_dir.name)
+        
+        # 5. 尝试直接在当前目录的 uploaded_inputs 下查找（递归搜索）
+        uploaded_dir = current_dir / "uploaded_inputs"
+        if uploaded_dir.exists():
+            for subdir in uploaded_dir.iterdir():
+                if subdir.is_dir() and subdir.name == b_dir.name:
+                    possible_paths.append(subdir)
+        
+        # 去重并检查
+        seen = set()
+        unique_paths = []
+        for p in possible_paths:
+            p_str = str(p)
+            if p_str not in seen:
+                seen.add(p_str)
+                unique_paths.append(p)
+        
+        found = False
+        for p in unique_paths:
+            if p.exists() and p.is_dir():
+                b_dir = p
+                found = True
+                break
+        
+        if not found:
+            raise FileNotFoundError(
+                f"B 模式图像文件夹不存在或不是文件夹: {b_folder_path}\n"
+                f"已尝试的路径: {[str(p) for p in unique_paths[:5]]}\n"
+                f"当前工作目录: {current_dir}\n"
+                f"请确保文件夹已上传到 uploaded_inputs 目录"
+            )
+    
     if not m_dir.exists() or not m_dir.is_dir():
-        raise FileNotFoundError(f"M 模式图像文件夹不存在或不是文件夹: {m_dir}")
+        current_dir = Path.cwd()
+        possible_paths = []
+        
+        # 1. 原始路径（已检查，不存在）
+        possible_paths.append(m_dir)
+        
+        # 2. 如果是相对路径，尝试相对于当前工作目录
+        if not m_dir.is_absolute():
+            possible_paths.append(current_dir / m_dir)
+        
+        # 3. 如果路径包含 "uploaded_inputs"，尝试在当前目录下查找
+        path_str = str(m_dir)
+        if "uploaded_inputs" in path_str:
+            # 提取 uploaded_inputs 之后的部分
+            parts = path_str.split("uploaded_inputs")
+            if len(parts) > 1:
+                rel_part = parts[1].lstrip("/\\")
+                possible_paths.append(current_dir / "uploaded_inputs" / rel_part)
+        
+        # 4. 尝试从路径中提取目录名
+        if m_dir.name:
+            possible_paths.append(current_dir / "uploaded_inputs" / m_dir.name)
+            possible_paths.append(current_dir / m_dir.name)
+        
+        # 5. 尝试直接在当前目录的 uploaded_inputs 下查找（递归搜索）
+        uploaded_dir = current_dir / "uploaded_inputs"
+        if uploaded_dir.exists():
+            for subdir in uploaded_dir.iterdir():
+                if subdir.is_dir() and subdir.name == m_dir.name:
+                    possible_paths.append(subdir)
+        
+        # 去重并检查
+        seen = set()
+        unique_paths = []
+        for p in possible_paths:
+            p_str = str(p)
+            if p_str not in seen:
+                seen.add(p_str)
+                unique_paths.append(p)
+        
+        found = False
+        for p in unique_paths:
+            if p.exists() and p.is_dir():
+                m_dir = p
+                found = True
+                break
+        
+        if not found:
+            raise FileNotFoundError(
+                f"M 模式图像文件夹不存在或不是文件夹: {m_folder_path}\n"
+                f"已尝试的路径: {[str(p) for p in unique_paths[:5]]}\n"
+                f"当前工作目录: {current_dir}\n"
+                f"请确保文件夹已上传到 uploaded_inputs 目录"
+            )
 
     pipeline = _get_pipeline()
 
