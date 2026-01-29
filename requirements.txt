@@ -10,6 +10,11 @@ tqdm
 pillow
 ttkbootstrap
 matplotlib
+fastmcp
+pydantic
+openai
+python-dotenv
+
 
 
 
