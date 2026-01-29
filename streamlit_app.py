@@ -313,14 +313,38 @@ if run_button:
             }
         )
         # 保存路径供 Agent 模式使用
+        # 注意：转换为相对路径，以便MCP服务器可以在自己的工作目录中找到文件
+        def to_relative_path(abs_path: str) -> str:
+            """将绝对路径转换为相对于项目根目录的相对路径"""
+            try:
+                abs_path_obj = Path(abs_path)
+                # 尝试转换为相对于当前工作目录的路径
+                try:
+                    rel_path = abs_path_obj.relative_to(Path.cwd())
+                    return str(rel_path)
+                except ValueError:
+                    # 如果无法转换为相对路径，尝试提取关键部分
+                    # 例如：从 D:\...\uploaded_inputs\B_single_xxx\file.jpg 
+                    # 提取为 uploaded_inputs/B_single_xxx/file.jpg
+                    parts = abs_path_obj.parts
+                    if "uploaded_inputs" in parts:
+                        idx = parts.index("uploaded_inputs")
+                        rel_parts = parts[idx:]
+                        return str(Path(*rel_parts))
+                    # 如果都不行，返回文件名（最后的手段）
+                    return abs_path_obj.name
+            except Exception:
+                # 如果转换失败，返回原始路径
+                return abs_path
+        
         if is_folder:
-            st.session_state["last_b_folder"] = b_path
-            st.session_state["last_m_folder"] = m_path
+            st.session_state["last_b_folder"] = to_relative_path(b_path)
+            st.session_state["last_m_folder"] = to_relative_path(m_path)
             st.session_state["last_b_path"] = None
             st.session_state["last_m_path"] = None
         else:
-            st.session_state["last_b_path"] = b_path
-            st.session_state["last_m_path"] = m_path
+            st.session_state["last_b_path"] = to_relative_path(b_path)
+            st.session_state["last_m_path"] = to_relative_path(m_path)
             st.session_state["last_b_folder"] = None
             st.session_state["last_m_folder"] = None
 
