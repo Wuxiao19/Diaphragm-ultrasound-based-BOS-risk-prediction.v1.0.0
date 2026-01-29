@@ -348,8 +348,10 @@ if run_button:
             st.session_state["last_b_folder"] = None
             st.session_state["last_m_folder"] = None
 
-        # Always clean temporary upload dirs and prune old detect/runX
-        cleanup_temp_dirs()
+        # 注意：不要立刻删除 uploaded_inputs 里的临时文件，
+        # 否则后面的 Agent 模式就找不到这些图片了。
+        # cleanup_temp_dirs()
+        # 仍然保留对 detect/runX 结果目录的清理，避免无限增长
         prune_detect_runs(KEEP_LAST_RUNS)
 
     except Exception as e:
