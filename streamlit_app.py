@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from integrated_detection_gui_ET import DetectionPipeline
+from detection_pipeline import DetectionPipeline
 
 
 # ============================================================
@@ -26,11 +26,9 @@ st.markdown(
     """  
 Upload **B-mode** and **M-mode** diaphragm ultrasound images
 for one patient (single exam) or for multiple patients (batch exams).
+
 The system will automatically perform: feature extraction → feature reduction
 → feature fusion → ExtraTrees-based binary classification.
-
-**Filename convention (IMPORTANT):**
-- filenames must contain `YY-MM-DD-<ID>` pattern, e.g. `24-05-01-C001_xxx`
 """
 )
 
@@ -41,11 +39,7 @@ The system will automatically perform: feature extraction → feature reduction
 
 @st.cache_resource(show_spinner=True)
 def get_pipeline():
-    """
-    Create and cache a DetectionPipeline instance.
-    We do not modify internal logic of integrated_detection_gui_ET.DetectionPipeline,
-    only reuse it here.
-    """
+    """Create and cache a DetectionPipeline instance."""
 
     # Use simple callback to accumulate logs into session_state for display
     if "log_messages" not in st.session_state:
@@ -118,7 +112,6 @@ def save_uploaded_files_as_folder(uploaded_files, subdir: str) -> str:
 # Keep at most this number of recent detect/runX directories (older ones are removed).
 KEEP_LAST_RUNS = 20
 
-
 # ============================================================
 # Sidebar: input mode
 # ============================================================
@@ -141,7 +134,7 @@ input_mode = st.sidebar.radio(
 st.subheader("1. Upload input data")
 st.caption(
     "File naming rule: each filename must start with `YY-MM-DD-<ID>`, "
-    "e.g. `24-05-01-C001_xxx.png`. The same patient ID on the same date "
+    "e.g. `24-05-01-A001_xxx.png`. The same patient ID on the same date "
     "will be merged as one exam."
 )
 
@@ -278,7 +271,6 @@ if run_button:
 
             # Save uploaded files and call original pipeline
             # Important: each run uses a unique sub-directory to avoid mixing with history
-            use_csv = False
             if input_mode == "single":
                 b_path = save_uploaded_file(b_file, _new_run_subdir("B_single"))
                 m_path = save_uploaded_file(m_file, _new_run_subdir("M_single"))
@@ -293,7 +285,6 @@ if run_button:
                 b_input=b_path,
                 m_input=m_path,
                 is_folder=is_folder,
-                use_csv=use_csv,
             )
 
         # Save this run's results into session_state (for later display/download)
@@ -326,19 +317,12 @@ if "last_results_df" in st.session_state and "last_output_dir" in st.session_sta
 
     st.success("Detection completed!")
 
-    # Logs
-    with st.expander("Show processing logs", expanded=False):
-        if st.session_state.log_messages:
-            st.text("".join(st.session_state.log_messages))
-        else:
-            st.write("No logs.")
-
     # Show prediction results table
     st.subheader("3. Detection result preview")
 
     # Show key result columns if they exist; otherwise show all columns
     key_cols = [
-        "merged_filename",
+        "merged_key",
         "b_filename",
         "m_filename",
         "risk_probability",
@@ -383,7 +367,7 @@ if "last_results_df" in st.session_state and "last_output_dir" in st.session_sta
             )
 
     # Recheck detection for batch patients
-    if is_folder and "merged_filename" in results_df.columns:
+    if is_folder and "merged_key" in results_df.columns:
         pattern = re.compile(r"(\d{2}-\d{2}-\d{2})-(C\d{3}|B\d{3}|P\d{3})")
 
         def _parse_merged(name: str):
@@ -393,7 +377,7 @@ if "last_results_df" in st.session_state and "last_output_dir" in st.session_sta
             return None, None
 
         temp = results_df.copy()
-        temp[["date", "patient_id"]] = temp["merged_filename"].apply(
+        temp[["date", "patient_id"]] = temp["merged_key"].apply(
             lambda x: pd.Series(_parse_merged(x))
         )
         temp = temp.dropna(subset=["date", "patient_id"])
