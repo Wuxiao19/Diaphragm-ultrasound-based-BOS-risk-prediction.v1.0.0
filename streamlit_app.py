@@ -1,14 +1,11 @@
 import os
-import re
 from pathlib import Path
 import shutil
 import uuid
-
-import numpy as np
 import pandas as pd
 import streamlit as st
 
-from detection_pipeline import DetectionPipeline
+from detection_pipeline import DetectionPipeline, parse_date_and_patient_id
 
 
 # ============================================================
@@ -32,9 +29,8 @@ The system will automatically perform: feature extraction → feature reduction
 """
 )
 
-
 # ============================================================
-# Cache DetectionPipeline instance (avoid re-loading models)
+# Cache DetectionPipeline instance
 # ============================================================
 
 @st.cache_resource(show_spinner=True)
@@ -72,17 +68,12 @@ def _clear_dir(path: Path) -> None:
 
 
 def _new_run_subdir(prefix: str) -> str:
-    """
-    Create a unique sub-directory name for this run,
-    so that different users/runs do not interfere with each other.
-    """
+    """Create a unique sub-directory name for this run,so that different users/runs do not interfere with each other."""
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
 
 
 def save_uploaded_file(uploaded_file, subdir: str) -> str:
-    """
-    Save a single uploaded file to disk and return its local path.
-    """
+    """Save a single uploaded file to disk and return its local path."""
     upload_root = ensure_upload_dir()
     target_dir = upload_root / subdir
     target_dir.mkdir(parents=True, exist_ok=True)
@@ -94,10 +85,7 @@ def save_uploaded_file(uploaded_file, subdir: str) -> str:
 
 
 def save_uploaded_files_as_folder(uploaded_files, subdir: str) -> str:
-    """
-    Save multiple uploaded files to one sub-directory,
-    simulating a "folder" input. Return that directory path.
-    """
+    """Save multiple uploaded files to one sub-directory,simulating a "folder" input. Return that directory path."""
     upload_root = ensure_upload_dir()
     target_dir = upload_root / subdir
     _clear_dir(target_dir)
@@ -321,14 +309,8 @@ if "last_results_df" in st.session_state and "last_output_dir" in st.session_sta
     st.subheader("3. Detection result preview")
 
     # Show key result columns if they exist; otherwise show all columns
-    key_cols = [
-        "merged_key",
-        "b_filename",
-        "m_filename",
-        "risk_probability",
-        "prediction",
-        "prediction_label",
-    ]
+    key_cols = ["merged_key","b_filename","m_filename",
+        "risk_probability","prediction","prediction_label",]
     show_cols = [c for c in key_cols if c in results_df.columns]
     st.dataframe(results_df[show_cols] if show_cols else results_df)
 
@@ -368,17 +350,9 @@ if "last_results_df" in st.session_state and "last_output_dir" in st.session_sta
 
     # Recheck detection for batch patients
     if is_folder and "merged_key" in results_df.columns:
-        pattern = re.compile(r"(\d{2}-\d{2}-\d{2})-(C\d{3}|B\d{3}|P\d{3})")
-
-        def _parse_merged(name: str):
-            m = pattern.match(str(name))
-            if m:
-                return m.group(1), m.group(2)
-            return None, None
-
         temp = results_df.copy()
         temp[["date", "patient_id"]] = temp["merged_key"].apply(
-            lambda x: pd.Series(_parse_merged(x))
+            lambda x: pd.Series(parse_date_and_patient_id(x))
         )
         temp = temp.dropna(subset=["date", "patient_id"])
 
@@ -401,7 +375,6 @@ if "last_results_df" in st.session_state and "last_output_dir" in st.session_sta
                     file_name="recheck_result.csv",
                     mime="text/csv",
                 )
-
 
 st.markdown("---")
 st.caption(
