@@ -365,7 +365,7 @@ class DetectionPipeline:
             all_probas.append(proba)
 
         avg_proba = np.mean(all_probas, axis=0)
-        predictions = (avg_proba >= 0.4210).astype(int)
+        predictions = (avg_proba >= 0.5).astype(int)
 
         self.log(f"Prediction done: {len(predictions)} samples")
         return avg_proba, predictions
@@ -395,7 +395,7 @@ class DetectionPipeline:
                 for name, group in results_df.groupby(group_key):
                     avg_proba = group["risk_probability"].mean()
                     #mode_pred = group["prediction"].mode().iloc[0]
-                    mode_pred = 1 if avg_proba >= 0.4210 else 0
+                    mode_pred = 1 if avg_proba >= 0.5 else 0
                     mode_label = "diseased" if mode_pred == 1 else "healthy"
                     aggregated_rows.append(
                         {
