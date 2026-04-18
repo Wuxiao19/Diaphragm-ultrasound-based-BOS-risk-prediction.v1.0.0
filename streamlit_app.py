@@ -19,7 +19,7 @@ st.set_page_config(
 )
 
 st.title(
-    "Diaphragm Ultrasound Analysis System"
+    "Diaphragm Ultrasound Analysis System",
     help=(
         "Upload **B-mode** and **M-mode** diaphragm ultrasound images"
         "for one patient (single exam) or for multiple patients (batch exams)."
@@ -120,7 +120,7 @@ input_mode = st.sidebar.radio(
 # ============================================================
 
 st.subheader(
-    "1. Upload input data"
+    "1. Upload input data",
     help=(
         "File naming rule: each filename must start with `YY-MM-DD-<ID>`, "
         "e.g. `24-05-01-A001_xxx.png`. The same patient ID on the same date "
