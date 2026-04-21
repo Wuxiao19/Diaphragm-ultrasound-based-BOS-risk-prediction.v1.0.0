@@ -381,5 +381,5 @@ if "last_results_df" in st.session_state and "last_output_dir" in st.session_sta
 
 st.markdown("---")
 st.caption(
-    "Developed by AlMSLab"
+    "Developed by AIMSLab"
 )
